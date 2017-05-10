@@ -20,6 +20,9 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,7 +34,7 @@ public class FSMServer {
 	static String myrole = "generic";
 	static String portNumberString = "4040";
 	static String urlString = "/fsmserver/api";
-	static String location = "/Users/stalbot/bin";
+	static String location = "/Users/stalbot";
 	static String payload = urlString + " port " + portNumberString + " response.";
 
     @SuppressWarnings("restriction")
@@ -52,7 +55,7 @@ public class FSMServer {
         HttpContext context = server.createContext(urlString);
         System.out.println(context.getPath());
         context.setHandler((he) -> {
-System.out.println("\n------- GOT REQUEST METHOD: " + he.getRequestMethod() + "-------");
+//System.out.println("\n------- GOT REQUEST METHOD: " + he.getRequestMethod() + "-------");
 //System.out.println("context path: " + context.getPath());
                 InputStreamReader isr =  new InputStreamReader(he.getRequestBody(),"utf-8");
                 BufferedReader br = new BufferedReader(isr);                
@@ -78,21 +81,25 @@ System.out.println("\n------- GOT REQUEST METHOD: " + he.getRequestMethod() + "-
                 	Integer i = new Integer(contentLengthString);
                 	contentLength = i.intValue();
                 }
-                String data = br.readLine();
                 URI uri = he.getRequestURI();
 //System.out.println("URI is <" + uri + ">");
                 String[] p = extractParametersFrom(uri, "____");
                 String event = p[1].substring(p[1].indexOf("=")+1);
 //System.out.println("Event: " + event);
+                String data = br.readLine();
+//System.out.println("data is <<<<<<<<<<<<\n" + data + "\n<<<<<<<<<<<<");
+		if (data != null)
+			data = data.replaceAll("xxxx","\n");
+//System.out.println("data is >>>>>>>>>>>>\n" + data + "\n>>>>>>>>>>>>");
                 
                 if (event.startsWith("eppLoad"))
                 {
-                    String protocolName = p[2].substring(p[2].indexOf("=")+1);
+                    	String protocolName = p[2].substring(p[2].indexOf("=")+1);
                 	String roleName = p[3].substring(p[3].indexOf("=")+1);
                 	String startState = null;
                 	myrole = roleName;
                 	// Extract the file name and load the behavior into the FSM
-//System.out.println("Loading easyFSM role from scribble");
+System.out.println("Loading easyFSM role from scribble");
                 	if (p.length >= 5)
                 	{
                 		startState = p[4].substring(p[4].indexOf("=")+1);
@@ -148,6 +155,7 @@ System.out.println("------- END REQUEST METHOD: " + he.getRequestMethod() + "---
     public static String eppLoad(String scribble, String protocol, String role)
     {
     	System.out.println("eppLoad ...");
+//System.out.println("<<<<\n" + scribble + "\n<<<<<");
     	// 1. Save scribble to a file.
     	// 2. build command
     	//		${ROOT}/bin/eppLoad scribble(as a file) protocol role
@@ -165,19 +173,32 @@ System.out.println("------- END REQUEST METHOD: " + he.getRequestMethod() + "---
     			break;
     		}
     	}
-    	String scribbleFile = location + "/" + moduleName + ".scr";
-    	String command = location + "/epp.sh " + scribbleFile + " " + protocol + " " + role;
+    	String scribbleFile = location + "/bin/generated/" + moduleName + ".scr";
+	// Save the scribble to icribb eFile
+	BufferedWriter writer = null;
+	PrintWriter out = null;
+	try {
+	    out = new PrintWriter( new FileWriter(scribbleFile));
+	    out.println(scribble);
+	    out.close( );
+	}
+	catch ( IOException e)
+	{
+		e.printStackTrace();
+	}
+	// Construct epp command
+    	String command = location + "/bin/epp.sh " + scribbleFile + " " + protocol + " " + role;
     	
-    	//System.out.println("command <" + command + ">");
+    	System.out.println("command <" + command + ">");
 
     	Shell sh = new Shell();
 		String output = sh.executeCommand(command);
 
-		//System.out.println("***\n" + output + "\n***");
-		output = sh.executeCommand("ls -ls /Users/stalbot/wip/projects/bin/generated");
-		//System.out.println("***\n" + output + "\n***");
+		System.out.println("***\n" + output + "\n***");
+		output = sh.executeCommand("ls -ls " + location + "/bin/generated");
+		System.out.println("***\n" + output + "\n***");
 		
-		return location + "/generated" + role + "_config.txt";
+		return location + "/bin/generated" + role + "_config.txt";
     }
     
     public static void executeScript(String s) 
@@ -194,7 +215,7 @@ System.out.println("------- END REQUEST METHOD: " + he.getRequestMethod() + "---
     }
     public static FSM eppInstantiate(String roleName)
     {
-    	String config = "/Users/stalbot/wip/projects/bin/generated/" + roleName + "_config.txt";
+    	String config = location + "/bin/generated/" + roleName + "_config.txt";
     	// 1. Open file <role>_config.txt
     	// 2. conduct start up of FSM
     	// 3. run FSM in modified runloop of httpserver
